@@ -1,0 +1,339 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using Semicrol.Documentos.GeneracionDocumentosWord;
+using DocumentFormat.OpenXml.Packaging;
+using System.Windows.Forms;
+using System.Drawing;
+using System.Xml;
+using System.IO;
+using Ap = DocumentFormat.OpenXml.ExtendedProperties;
+using DocumentFormat.OpenXml.Wordprocessing;
+using DocumentFormat.OpenXml;
+using M = DocumentFormat.OpenXml.Math;
+using Ovml = DocumentFormat.OpenXml.Vml.Office;
+using V = DocumentFormat.OpenXml.Vml;
+using A = DocumentFormat.OpenXml.Drawing;
+using DW = DocumentFormat.OpenXml.Drawing.Wordprocessing;
+using PIC = DocumentFormat.OpenXml.Drawing.Pictures;
+using Op = DocumentFormat.OpenXml.CustomProperties;
+using Vt = DocumentFormat.OpenXml.VariantTypes;
+
+namespace Manejador.dll
+{
+    public class GestorWord
+    {
+        private int NumeroPropiedadesPersonalizadas = 1;
+        private List<string> TitulosPropiedades = new List<string>();
+        //private bool TitulosCargados = false;
+
+        /// <summary>
+        /// Obtiene las propiedades de un documento Word
+        /// </summary>
+        /// <param name="nombreDocumento">Ruta del documento Word</param>
+        /// <returns>Lista con las propiedades del documento Word</returns>
+        public List<string> ObtenerPropiedades(string nombreDocumento)
+        {
+
+            List<string> listaPropiedades = new List<string>();
+            using (WordprocessingDocument documento = WordprocessingDocument.Open(nombreDocumento, false))
+            {
+                var propiedades = documento.ExtendedFilePropertiesPart.Properties; //guardamos las propiedades del documento
+                if (propiedades.TitlesOfParts != null)
+                {
+                    listaPropiedades.Add("Título: " + propiedades.TitlesOfParts.VTVector.InnerText);
+                }
+                else { listaPropiedades.Add("Título: (Sin Título)"); }
+
+                listaPropiedades.Add("Número de páginas: " + propiedades.Pages.Text);
+                listaPropiedades.Add("Número de párrafos: " + propiedades.Paragraphs.Text);
+                listaPropiedades.Add("Número de palabras: " + propiedades.Words.Text);
+
+            }
+            return listaPropiedades;
+        }
+
+        /// <summary>
+        /// Añade un parrafo de texto a un documento Word 
+        /// </summary>
+        /// <param name="nombreDocumento"> Ruta del documento Word </param>
+        /// <param name="texto"> Texto del párrafo que se va a añadir. </param>
+        /// <param name="estiloLetra"> n = negrita, s = subrayado, c = cursiva</param>
+        public void AñadirParrafo(string nombreDocumento, string texto, string estiloLetra)
+        {
+            using (WordprocessingDocument documento = WordprocessingDocument.Open(nombreDocumento, true))
+            {                
+                DocumentFormat.OpenXml.Wordprocessing.Paragraph parrafo = new DocumentFormat.OpenXml.Wordprocessing.Paragraph() {};
+                DocumentFormat.OpenXml.Wordprocessing.Run run = new DocumentFormat.OpenXml.Wordprocessing.Run();
+                DocumentFormat.OpenXml.Wordprocessing.Text elTexto = new DocumentFormat.OpenXml.Wordprocessing.Text();
+                elTexto.Text = texto;
+                
+                if (estiloLetra.Contains("n"))
+                {
+                    DocumentFormat.OpenXml.Wordprocessing.RunProperties runProperties =
+                        new DocumentFormat.OpenXml.Wordprocessing.RunProperties();
+                    DocumentFormat.OpenXml.Wordprocessing.Bold negrita = new DocumentFormat.OpenXml.Wordprocessing.Bold();
+                    runProperties.Append(negrita);
+                    run.Append(runProperties);
+                }
+
+                if (estiloLetra.Contains("s"))
+                {
+                    DocumentFormat.OpenXml.Wordprocessing.RunProperties runProperties =
+                        new DocumentFormat.OpenXml.Wordprocessing.RunProperties();
+                    DocumentFormat.OpenXml.Wordprocessing.Underline subrayado = new DocumentFormat.OpenXml.Wordprocessing.Underline() { Val = DocumentFormat.OpenXml.Wordprocessing.UnderlineValues.Single };
+                    runProperties.Append(subrayado);
+                    run.Append(runProperties);
+                }
+
+                if (estiloLetra.Contains("c"))
+                {
+                    DocumentFormat.OpenXml.Wordprocessing.RunProperties runProperties =
+                        new DocumentFormat.OpenXml.Wordprocessing.RunProperties();
+                    DocumentFormat.OpenXml.Wordprocessing.Italic cursiva = new DocumentFormat.OpenXml.Wordprocessing.Italic();
+                    runProperties.Append(cursiva);
+                    run.Append(runProperties);
+                }
+
+                run.Append(elTexto);
+                parrafo.Append(run);
+                documento.MainDocumentPart.Document.Body.Append(parrafo);
+                
+                documento.MainDocumentPart.Document.Save();
+            }
+        }
+
+        /// <summary>
+        /// Añade una tabla a un documento Word
+        /// </summary>
+        /// <param name="nombreDocumento"> Ruta del documento Word </param>
+        /// <param name="numFilas"> Numero de filas de la tabla </param>
+        /// <param name="numColumnas"> Numero de columnas de la tabla</param>
+        /// /// <param name="contenido"> Contenido de la tabla</param>
+        public void crearTabla(string nombreDocumento, int numFilas, int numColumnas, string[,] contenido)
+        {
+            using (WordprocessingDocument documento = WordprocessingDocument.Open(nombreDocumento, true))
+            {
+                Table table = new Table();
+                TableProperties tableProperties = new TableProperties();
+                TableStyle tableStyle = new TableStyle() { Val = "Tablaconcuadrcula" };
+                TableWidth tableWidth = new TableWidth() { Width = "0", Type = TableWidthUnitValues.Auto };
+                TableLook tableLook = new TableLook() { Val = "04A0", FirstRow = true, LastRow = false, FirstColumn = true, LastColumn = false, NoHorizontalBand = false, NoVerticalBand = true };
+
+                tableProperties.Append(tableStyle);
+                tableProperties.Append(tableWidth);
+                tableProperties.Append(tableLook);
+
+                TableGrid tableGrid = new TableGrid();
+                for (int i = 0; i < numColumnas; i++)
+                {
+                    GridColumn gridColumn = new GridColumn() { Width = "2831" };
+                    tableGrid.Append(gridColumn);
+                }
+
+                for (int i = 0; i < numFilas; i++)
+                {
+                    TableRow tableRow = new TableRow() { RsidTableRowAddition = "00F86CDD", RsidTableRowProperties = "00F86CDD" };
+
+                    for (int j = 0; j < numColumnas; j++)
+                    {
+                        TableCell tableCell = new TableCell();
+                        TableCellProperties tableCellProperties = new TableCellProperties();
+                        TableCellWidth tableCellWidth = new TableCellWidth() { Width = "2831", Type = TableWidthUnitValues.Dxa };
+                        tableCellProperties.Append(tableCellWidth);
+                        Paragraph paragraph = new Paragraph() { RsidParagraphAddition = "00F86CDD", RsidRunAdditionDefault = "00F86CDD" };
+                        Run run = new Run();
+                        Text text = new Text();
+                        text.Text = contenido[i, j];
+                        run.Append(text);
+                        paragraph.Append(run);
+                        tableCell.Append(tableCellProperties);
+                        tableCell.Append(paragraph);
+                        tableRow.Append(tableCell);
+                    }
+
+                    table.Append(tableRow);
+                }
+
+                documento.MainDocumentPart.Document.Body.Append(table);
+            }
+        }
+
+        /// <summary>
+        /// Inserta una imagen a un documento Word
+        /// </summary>
+        /// <param name="nombreDocumento"> Ruta del documento Word </param>
+        /// <param name="numFilas"> Ruta de la imagen </param>
+        /// <param name="numColumnas"> Ancho de la imagen, en centimetros</param>
+        /// /// <param name="contenido"> Largo de la imagen, en centimetros</param>
+        public void insertarImagen(string nombreDocumento, string nombreImagen, int cx, int cy)
+        {
+            using (WordprocessingDocument wordprocessingDocument = WordprocessingDocument.Open(nombreDocumento, true))
+            {
+                MainDocumentPart mainPart = wordprocessingDocument.MainDocumentPart;
+
+                ImagePart imagePart = mainPart.AddImagePart(ImagePartType.Jpeg);
+
+                using (FileStream stream = new FileStream(nombreImagen, FileMode.Open))
+                {
+                    imagePart.FeedData(stream);
+                }
+
+                this.añadirImagenADocumento(wordprocessingDocument, mainPart.GetIdOfPart(imagePart), cx, cy);
+            }
+        }
+
+        /// <summary>
+        /// Añade una imagen a un documento Word
+        /// </summary>
+        /// <param name="documentoWord"> Documento Word  </param>
+        /// <param name="relacionID"> Relacion </param>
+        /// <param name="numColumnas"> Ancho de la imagen, en centimetros</param>
+        /// /// <param name="contenido"> Largo de la imagen, en centimetros</param>
+        private void añadirImagenADocumento(WordprocessingDocument documentoWord, string relacionID, int cx, int cy)
+        {
+            var element =
+                 new DocumentFormat.OpenXml.Wordprocessing.Drawing(
+                     new DW.Inline(
+                         new DW.Extent() { Cx = cx * 360000L, Cy = cy * 360000L },
+                         new DW.EffectExtent()
+                         {
+                             LeftEdge = 0L,
+                             TopEdge = 0L,
+                             RightEdge = 0L,
+                             BottomEdge = 0L
+                         },
+                         new DW.DocProperties()
+                         {
+                             Id = (UInt32Value)1U,
+                             Name = "Picture 1"
+                         },
+                         new DW.NonVisualGraphicFrameDrawingProperties(
+                             new DocumentFormat.OpenXml.Drawing.GraphicFrameLocks() { NoChangeAspect = true }),
+                         new DocumentFormat.OpenXml.Drawing.Graphic(
+                             new DocumentFormat.OpenXml.Drawing.GraphicData(
+                                 new PIC.Picture(
+                                     new PIC.NonVisualPictureProperties(
+                                         new PIC.NonVisualDrawingProperties()
+                                         {
+                                             Id = (UInt32Value)0U,
+                                             Name = "New Bitmap Image.jpg"
+                                         },
+                                         new PIC.NonVisualPictureDrawingProperties()),
+                                     new PIC.BlipFill(
+                                         new DocumentFormat.OpenXml.Drawing.Blip(
+                                             new DocumentFormat.OpenXml.Drawing.BlipExtensionList(
+                                                 new DocumentFormat.OpenXml.Drawing.BlipExtension()
+                                                 {
+                                                     Uri =
+                                                       "{28A0092B-C50C-407E-A947-70E740481C1C}"
+                                                 })
+                                         )
+                                         {
+                                             Embed = relacionID,
+                                             CompressionState =
+                                             DocumentFormat.OpenXml.Drawing.BlipCompressionValues.Print
+                                         },
+                                         new DocumentFormat.OpenXml.Drawing.Stretch(
+                                             new DocumentFormat.OpenXml.Drawing.FillRectangle())),
+                                     new PIC.ShapeProperties(
+                                         new DocumentFormat.OpenXml.Drawing.Transform2D(
+                                             new DocumentFormat.OpenXml.Drawing.Offset() { X = 0L, Y = 0L },
+                                             new DocumentFormat.OpenXml.Drawing.Extents() { Cx = cx * 360000L, Cy = cy * 360000L }),
+                                         new DocumentFormat.OpenXml.Drawing.PresetGeometry(
+                                             new DocumentFormat.OpenXml.Drawing.AdjustValueList()
+                                         ) { Preset = DocumentFormat.OpenXml.Drawing.ShapeTypeValues.Rectangle }))
+                             ) { Uri = "http://schemas.openxmlformats.org/drawingml/2006/picture" })
+                     )
+                     {
+                         DistanceFromTop = (UInt32Value)0U,
+                         DistanceFromBottom = (UInt32Value)0U,
+                         DistanceFromLeft = (UInt32Value)0U,
+                         DistanceFromRight = (UInt32Value)0U,
+                         EditId = "50D07946"
+                     });
+
+            documentoWord.MainDocumentPart.Document.Body.AppendChild(new DocumentFormat.OpenXml.Wordprocessing.Paragraph
+                (new DocumentFormat.OpenXml.Wordprocessing.Run(element)));
+        }
+
+
+        /// <summary>
+        /// Crea una nueva propiedad personalizada
+        /// <param name="nombreDocumento"> Ruta del documento Word  </param>
+        /// <param name="nombrePropiedad"> Nombre de la propiedad </param>
+        /// <param name="numColumnas"> Contenido de la propiedad</param>
+        /// </summary>
+        public void crearPropiedadDocumentoPersonalizada(string nombreDocumento, string nombrePropiedad, string contenidoPropiedad)
+        {
+            using (WordprocessingDocument documento = WordprocessingDocument.Open(nombreDocumento, true))
+            {
+                int numeroPropiedadesPersonalizadasEnElDocumento = 2; // PropertyId empieza en 2 
+                foreach (var Propiedadespersonalizadas in documento.CustomFilePropertiesPart.Properties.ChildElements)
+                {
+                    numeroPropiedadesPersonalizadasEnElDocumento++;
+                    NumeroPropiedadesPersonalizadas = numeroPropiedadesPersonalizadasEnElDocumento;
+                }
+
+                Op.CustomDocumentProperty propiedadPersonalizada1 = new Op.CustomDocumentProperty() 
+                    { FormatId = "{D5CDD505-2E9C-101B-9397-08002B2CF9AE}", PropertyId = NumeroPropiedadesPersonalizadas++, Name = nombrePropiedad };
+
+                Vt.VTLPWSTR vTLPWSTR1 = new Vt.VTLPWSTR();
+                vTLPWSTR1.Text = contenidoPropiedad;
+                propiedadPersonalizada1.Append(vTLPWSTR1);
+                documento.CustomFilePropertiesPart.Properties.Append(propiedadPersonalizada1);
+                documento.CustomFilePropertiesPart.Properties.Save();
+                this.TitulosPropiedades.Add(nombrePropiedad);
+            }
+        }
+
+        /// <summary>
+        /// Inserta una propiedad a un documento Word
+        /// </summary>
+        /// <param name="nombreDocumento"> Ruta del documento Word </param>
+        /// <param name="idPropiedad"> Identificador de la propiedad </param>
+        public void insertarPropiedad(string nombreFichero, int idPropiedad)
+        {
+            using (WordprocessingDocument documento = WordprocessingDocument.Open(nombreFichero, true))
+            {
+                Paragraph parrafo = new Paragraph();
+
+                Run run1 = new Run();
+                FieldChar fieldChar1 = new FieldChar() { FieldCharType = FieldCharValues.Begin };
+
+                run1.Append(fieldChar1);
+
+                Run run2 = new Run();
+                FieldCode fieldCode1 = new FieldCode() { Space = SpaceProcessingModeValues.Preserve };
+                fieldCode1.Text = " DOCPROPERTY   " + TitulosPropiedades[idPropiedad] + "   \\* MERGEFORMAT ";
+
+                run2.Append(fieldCode1);
+
+                Run run3 = new Run();
+                FieldChar fieldChar2 = new FieldChar() { FieldCharType = FieldCharValues.Separate };
+
+                run3.Append(fieldChar2);
+
+                Run run4 = new Run();
+                Text text1 = new Text();
+                text1.Text = documento.CustomFilePropertiesPart.Properties.ChildElements[idPropiedad].InnerText;
+
+                run4.Append(text1);
+
+                Run run5 = new Run();
+                FieldChar fieldChar3 = new FieldChar() { FieldCharType = FieldCharValues.End };
+                run5.Append(fieldChar3);
+
+                parrafo.Append(run1);
+                parrafo.Append(run2);
+                parrafo.Append(run3);
+                parrafo.Append(run4);
+                parrafo.Append(run5);
+
+                documento.MainDocumentPart.Document.Body.Append(parrafo);
+                documento.MainDocumentPart.Document.Save();
+            }
+        }
+    }  
+}
