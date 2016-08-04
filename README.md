@@ -1,6 +1,4 @@
-# Word
-
-public void AñadirEncabezado(string nombreDocumento, string contenidoEncabezado)
+     public void AñadirEncabezado(string nombreDocumento, string contenidoEncabezado)
         {
             this.TieneEncabezado(nombreDocumento);
             using (WordprocessingDocument documento = WordprocessingDocument.Open(nombreDocumento, true))
